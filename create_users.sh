@@ -53,7 +53,7 @@ while IFS=';' read -r username groups; do
     echo "$username:$password" | chpasswd
     echo "$(date) - Password set for user $username." | tee -a $LOG_FILE
 
-    # Save the password securely in the passwordfile
+    # Save the password securely in the passwordfile for reference
     echo "$username:$password" >> $PASSWORD_FILE
     echo "$(date) - Password for user $username saved to $PASSWORD_FILE." | tee -a $LOG_FILE
 done < $USER_FILE
