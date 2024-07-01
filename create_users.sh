@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# define the Log file location for logging
+# Define the log file location for logging
 LOG_FILE="/var/log/user_management.log"
 
-#define the location of the passwordfile where the generated password for each user will be stored
+# Define the location of the password file where the generated password for each user will be stored
 PASSWORD_FILE="/var/secure/user_passwords.txt"
 
-#Define the location of the users files and groups for ceration of users nad groups
-#You can Update this path if users.txt file is in a different directory
+# Define the location of the users file and groups for creation of users and groups
+# You can update this path if users.txt file is in a different directory
 USER_FILE="users.txt" 
 
 # Function to generate a random 12 character password for alphanumeric passwords
@@ -18,9 +18,16 @@ generate_password() {
 
 # Ensure log file and password file exist by using the touch command to create them and if they exist, it does not overwrite
 touch $LOG_FILE
+
+# Check if /var/secure directory exists, if not, create it
+if [ ! -d "/var/secure" ]; then
+    mkdir -p /var/secure
+    echo "$(date) - Created /var/secure directory." | tee -a $LOG_FILE
+fi
+
 touch $PASSWORD_FILE
 
-# Read the file with user information and the groups to which they should belong to.
+# Read the file with user information and the groups to which they should belong to
 while IFS=';' read -r username groups; do
     # Remove leading/trailing whitespace
     username=$(echo $username | xargs)
@@ -53,7 +60,7 @@ while IFS=';' read -r username groups; do
     echo "$username:$password" | chpasswd
     echo "$(date) - Password set for user $username." | tee -a $LOG_FILE
 
-    # Save the password securely in the passwordfile for reference
+    # Save the password securely in the password file for reference
     echo "$username:$password" >> $PASSWORD_FILE
     echo "$(date) - Password for user $username saved to $PASSWORD_FILE." | tee -a $LOG_FILE
 done < $USER_FILE
