@@ -7,12 +7,13 @@ LOG_FILE="/var/log/user_management.log"
 PASSWORD_FILE="/var/secure/user_passwords.txt"
 
 # Define the location of the users file for creation of users and groups
-# Update this path if users.txt file is in a different directory
 USER_FILE="users.txt"
 
-# Ensure log file and password file exist
+# Ensure log file and password file exist and set proper permissions
 touch $LOG_FILE
+chmod 600 $LOG_FILE
 touch $PASSWORD_FILE
+chmod 600 $PASSWORD_FILE
 
 # Create /var/secure directory if it doesn't exist
 if [ ! -d "/var/secure" ]; then
@@ -21,74 +22,82 @@ if [ ! -d "/var/secure" ]; then
     echo "$(date) - Created /var/secure directory." | tee -a $LOG_FILE
 fi
 
+# Function to log messages
+log_message() {
+    echo "$(date) - $1" | tee -a $LOG_FILE
+}
+
 # Function to generate a random 12 character alphanumeric password
 generate_password() {
     local PASSWORD_LENGTH=12
     echo "$(tr -dc A-Za-z0-9 </dev/urandom | head -c ${PASSWORD_LENGTH} ; echo '')"
 }
 
+# Ensure the users.txt file exists
+if [ ! -f $USER_FILE ]; then
+    log_message "User file $USER_FILE does not exist. Exiting."
+    exit 1
+fi
+
 # Step 1: Create Users
-echo "Starting user creation process..." | tee -a $LOG_FILE
+log_message "Starting user creation process..."
 while IFS=';' read -r username groups; do
-    # Remove leading/trailing whitespace
     username=$(echo $username | xargs)
     groups=$(echo $groups | xargs)
 
-    # Check if user already exists
     if id "$username" &>/dev/null; then
-        echo "$(date) - User $username already exists." | tee -a $LOG_FILE
+        log_message "User $username already exists."
         continue
     fi
 
-    # Create user and personal group
     groupadd $username
     if [ $? -ne 0 ]; then
-        echo "$(date) - Failed to create group $username." | tee -a $LOG_FILE
+        log_message "Failed to create group $username."
         continue
     fi
 
     useradd -m -g $username $username
     if [ $? -eq 0 ]; then
-        echo "$(date) - User $username and group $username created." | tee -a $LOG_FILE
+        log_message "User $username and group $username created."
     else
-        echo "$(date) - Failed to create user $username." | tee -a $LOG_FILE
+        log_message "Failed to create user $username."
         continue
     fi
 
-    # Generate and set password for the user
     password=$(generate_password)
     echo "$username:$password" | chpasswd
-    echo "$(date) - Password set for user $username." | tee -a $LOG_FILE
+    if [ $? -eq 0 ]; then
+        log_message "Password set for user $username."
+    else
+        log_message "Failed to set password for user $username."
+        continue
+    fi
 
-    # Save the password securely
     echo "$username:$password" >> $PASSWORD_FILE
-    echo "$(date) - Password for user $username saved to $PASSWORD_FILE." | tee -a $LOG_FILE
+    log_message "Password for user $username saved to $PASSWORD_FILE."
 done < $USER_FILE
 
 # Step 2: Add Users to Groups
-echo "Starting group assignment process..." | tee -a $LOG_FILE
+log_message "Starting group assignment process..."
 while IFS=';' read -r username groups; do
-    # Remove leading/trailing whitespace
     username=$(echo $username | xargs)
     groups=$(echo $groups | xargs)
 
-    # Check if user exists before adding to groups
     if ! id "$username" &>/dev/null; then
-        echo "$(date) - User $username does not exist. Skipping group assignment." | tee -a $LOG_FILE
+        log_message "User $username does not exist. Skipping group assignment."
         continue
     fi
 
-    # Add user to additional groups specified in the users.txt file
     IFS=',' read -ra GROUP_ARRAY <<< "$groups"
     for group in "${GROUP_ARRAY[@]}"; do
         group=$(echo $group | xargs)
         if ! getent group $group > /dev/null 2>&1; then
             groupadd $group
-            echo "$(date) - Group $group created." | tee -a $LOG_FILE
+            log_message "Group $group created."
         fi
         usermod -aG $group $username
-        echo "$(date) - User $username added to group $group." | tee -a $LOG_FILE
+        log_message "User $username added to group $group."
     done
 done < $USER_FILE
 
-echo "User and group creation process completed." | tee -a $LOG_FILE
+log_message "User and group creation process completed."
