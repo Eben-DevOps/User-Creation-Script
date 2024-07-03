@@ -1,3 +1,0 @@
-John; Dev_Team,Security,Help_desk
-Francis; Security,Help_desk,Infrastructure
-Susan; Human_resources,Team-managers,Admin
